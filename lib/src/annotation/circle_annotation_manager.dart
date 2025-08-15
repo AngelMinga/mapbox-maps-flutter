@@ -14,6 +14,12 @@ class CircleAnnotationManager extends BaseAnnotationManager {
 
   final _CircleAnnotationMessenger _annotationMessenger;
   final String _channelSuffix;
+  final Set<String> _managedAnnotationIds = {}; // Added to track annotation IDs
+
+  /// Checks if an annotation with the given ID is managed by this manager.
+  bool contains(String annotationId) {
+    return _managedAnnotationIds.contains(annotationId);
+  }
 
   /// Add a listener to receive the callback when an annotation is clicked.
   @Deprecated('Use [tapEvents] instead.')
@@ -90,24 +96,40 @@ class CircleAnnotationManager extends BaseAnnotationManager {
   }
 
   /// Create a new annotation with the option.
-  Future<CircleAnnotation> create(CircleAnnotationOptions annotation) =>
-      _annotationMessenger.create(id, annotation);
+  Future<CircleAnnotation> create(CircleAnnotationOptions annotationOpt) async {
+    final createdAnnotation = await _annotationMessenger.create(id, annotationOpt);
+    _managedAnnotationIds.add(createdAnnotation.id);
+    return createdAnnotation;
+  }
 
   /// Create multi annotations with the options.
   Future<List<CircleAnnotation?>> createMulti(
-          List<CircleAnnotationOptions> annotations) =>
-      _annotationMessenger.createMulti(id, annotations);
+      List<CircleAnnotationOptions> annotationsOpts) async {
+    final createdAnnotations = await _annotationMessenger.createMulti(id, annotationsOpts);
+    _managedAnnotationIds.addAll(createdAnnotations.whereType<CircleAnnotation>().map((annotation) => annotation.id));
+    /*for (var annotation in createdAnnotations) {
+      if (annotation != null) {
+        _managedAnnotationIds.add(annotation.id);
+      }
+    }*/
+    return createdAnnotations;
+  }
 
   /// Update an added annotation with new properties.
   Future<void> update(CircleAnnotation annotation) =>
       _annotationMessenger.update(id, annotation);
 
   /// Delete an added annotation.
-  Future<void> delete(CircleAnnotation annotation) =>
-      _annotationMessenger.delete(id, annotation);
+  Future<void> delete(CircleAnnotation annotation) async {
+    await _annotationMessenger.delete(id, annotation);
+    _managedAnnotationIds.remove(annotation.id);
+  }
 
   /// Delete all the annotation added by this manager.
-  Future<void> deleteAll() => _annotationMessenger.deleteAll(id);
+  Future<void> deleteAll() async {
+    await _annotationMessenger.deleteAll(id);
+    _managedAnnotationIds.clear();
+  }
 
   /// Selects the base of circle-elevation. Some modes might require precomputed elevation data in the tileset. Default value: "none".
   @experimental

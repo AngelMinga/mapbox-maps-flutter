@@ -14,6 +14,12 @@ class PointAnnotationManager extends BaseAnnotationManager {
 
   final _PointAnnotationMessenger _annotationMessenger;
   final String _channelSuffix;
+  final Set<String> _managedAnnotationIds = {}; // Added to track annotation IDs
+
+  /// Checks if an annotation with the given ID is managed by this manager.
+  bool contains(String annotationId) {
+    return _managedAnnotationIds.contains(annotationId);
+  }
 
   /// Add a listener to receive the callback when an annotation is clicked.
   @Deprecated('Use [tapEvents] instead.')
@@ -89,24 +95,40 @@ class PointAnnotationManager extends BaseAnnotationManager {
   }
 
   /// Create a new annotation with the option.
-  Future<PointAnnotation> create(PointAnnotationOptions annotation) =>
-      _annotationMessenger.create(id, annotation);
+  Future<PointAnnotation> create(PointAnnotationOptions annotationOpt) async {
+    final createdAnnotation = await _annotationMessenger.create(id, annotationOpt);
+    _managedAnnotationIds.add(createdAnnotation.id);
+    return createdAnnotation;
+  }
 
   /// Create multi annotations with the options.
   Future<List<PointAnnotation?>> createMulti(
-          List<PointAnnotationOptions> annotations) =>
-      _annotationMessenger.createMulti(id, annotations);
+      List<PointAnnotationOptions> annotationsOpts) async {
+    final createdAnnotations = await _annotationMessenger.createMulti(id, annotationsOpts);
+    _managedAnnotationIds.addAll(createdAnnotations.whereType<PointAnnotation>().map((annotation) => annotation.id));
+   /* for (var annotation in createdAnnotations) {
+      if (annotation != null) {
+        _managedAnnotationIds.add(annotation.id);
+      }
+    }*/
+    return createdAnnotations;
+  }
 
   /// Update an added annotation with new properties.
   Future<void> update(PointAnnotation annotation) =>
       _annotationMessenger.update(id, annotation);
 
   /// Delete an added annotation.
-  Future<void> delete(PointAnnotation annotation) =>
-      _annotationMessenger.delete(id, annotation);
+  Future<void> delete(PointAnnotation annotation) async {
+    await _annotationMessenger.delete(id, annotation);
+    _managedAnnotationIds.remove(annotation.id);
+  }
 
   /// Delete all the annotation added by this manager.
-  Future<void> deleteAll() => _annotationMessenger.deleteAll(id);
+  Future<void> deleteAll() async {
+    await _annotationMessenger.deleteAll(id);
+    _managedAnnotationIds.clear();
+  }
 
   /// If true, the icon will be visible even if it collides with other previously drawn symbols. Default value: false.
   Future<void> setIconAllowOverlap(bool iconAllowOverlap) =>

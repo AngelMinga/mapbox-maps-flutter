@@ -14,6 +14,12 @@ class PolylineAnnotationManager extends BaseAnnotationManager {
 
   final _PolylineAnnotationMessenger _annotationMessenger;
   final String _channelSuffix;
+  final Set<String> _managedAnnotationIds = {}; // Added to track annotation IDs
+
+  /// Checks if an annotation with the given ID is managed by this manager.
+  bool contains(String annotationId) {
+    return _managedAnnotationIds.contains(annotationId);
+  }
 
   /// Add a listener to receive the callback when an annotation is clicked.
   @Deprecated('Use [tapEvents] instead.')
@@ -90,24 +96,40 @@ class PolylineAnnotationManager extends BaseAnnotationManager {
   }
 
   /// Create a new annotation with the option.
-  Future<PolylineAnnotation> create(PolylineAnnotationOptions annotation) =>
-      _annotationMessenger.create(id, annotation);
+  Future<PolylineAnnotation> create(PolylineAnnotationOptions annotationOpt) async {
+    final createdAnnotation = await _annotationMessenger.create(id, annotationOpt);
+    _managedAnnotationIds.add(createdAnnotation.id);
+    return createdAnnotation;
+  }
 
   /// Create multi annotations with the options.
   Future<List<PolylineAnnotation?>> createMulti(
-          List<PolylineAnnotationOptions> annotations) =>
-      _annotationMessenger.createMulti(id, annotations);
+      List<PolylineAnnotationOptions> annotationsOpts) async {
+    final createdAnnotations = await _annotationMessenger.createMulti(id, annotationsOpts);
+    _managedAnnotationIds.addAll(createdAnnotations.whereType<PolylineAnnotation>().map((annotation) => annotation.id));
+    /*for (var annotation in createdAnnotations) {
+      if (annotation != null) {
+        _managedAnnotationIds.add(annotation.id);
+      }
+    }*/
+    return createdAnnotations;
+  }
 
   /// Update an added annotation with new properties.
   Future<void> update(PolylineAnnotation annotation) =>
       _annotationMessenger.update(id, annotation);
 
   /// Delete an added annotation.
-  Future<void> delete(PolylineAnnotation annotation) =>
-      _annotationMessenger.delete(id, annotation);
+  Future<void> delete(PolylineAnnotation annotation) async {
+    await _annotationMessenger.delete(id, annotation);
+    _managedAnnotationIds.remove(annotation.id);
+  }
 
   /// Delete all the annotation added by this manager.
-  Future<void> deleteAll() => _annotationMessenger.deleteAll(id);
+  Future<void> deleteAll() async {
+    await _annotationMessenger.deleteAll(id);
+    _managedAnnotationIds.clear();
+  }
 
   /// The display of line endings. Default value: "butt".
   Future<void> setLineCap(LineCap lineCap) =>
